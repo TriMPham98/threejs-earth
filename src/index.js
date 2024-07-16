@@ -14,7 +14,8 @@ import {
 
 // Other deps
 import { loadTexture } from "./common-utils";
-import Albedo from "./assets/Albedo.jpg";
+import Albedo from "./assets/Albedo.png"; // Changed from .jpg to .png
+import Bump from "./assets/Bump.jpg";
 
 global.THREE = THREE;
 // previously this feature is .legacyMode = false, see https://www.donmccurdy.com/2020/06/17/color-management-in-threejs/
@@ -28,6 +29,7 @@ const params = {
   // general scene params
   sunIntensity: 1.8, // brightness of the sun
   speedFactor: 2.0, // rotation speed of the earth
+  bumpScale: 0.03, // scale of the bump map effect
 };
 
 /**************************************************
@@ -74,6 +76,10 @@ let app = {
     albedoMap.colorSpace = THREE.SRGBColorSpace;
     await updateLoadingProgressBar(0.2);
 
+    // load the bump map as a texture
+    const bumpMap = await loadTexture(Bump);
+    await updateLoadingProgressBar(0.3);
+
     // create group for easier manipulation of objects(ie later with clouds and atmosphere added)
     this.group = new THREE.Group();
     // earth's axial tilt is 23.5 degrees
@@ -82,6 +88,8 @@ let app = {
     let earthGeo = new THREE.SphereGeometry(10, 64, 64);
     let earthMat = new THREE.MeshStandardMaterial({
       map: albedoMap,
+      bumpMap: bumpMap,
+      bumpScale: params.bumpScale, // must be really small, if too high even bumps on the back side got lit up
     });
     this.earth = new THREE.Mesh(earthGeo, earthMat);
     this.group.add(this.earth);
@@ -100,6 +108,12 @@ let app = {
       })
       .name("Sun Intensity");
     gui.add(params, "speedFactor", 0.1, 20.0, 0.1).name("Rotation Speed");
+    gui
+      .add(params, "bumpScale", 0, 0.1, 0.001)
+      .onChange((val) => {
+        this.earth.material.bumpScale = val;
+      })
+      .name("Bump Scale");
 
     // Stats - show fps
     this.stats1 = new Stats();
