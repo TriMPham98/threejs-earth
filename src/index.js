@@ -17,6 +17,7 @@ import { loadTexture } from "./common-utils";
 import Albedo from "./assets/Albedo.png";
 import Bump from "./assets/Bump.jpg";
 import Clouds from "./assets/Clouds.png";
+import Ocean from "./assets/Ocean.png";
 
 global.THREE = THREE;
 THREE.ColorManagement.enabled = true;
@@ -28,6 +29,7 @@ const params = {
   sunIntensity: 1.8,
   speedFactor: 2.0,
   bumpScale: 0.03,
+  metalness: 0.1,
 };
 
 /**************************************************
@@ -63,6 +65,9 @@ let app = {
     const cloudsMap = await loadTexture(Clouds);
     await updateLoadingProgressBar(0.4);
 
+    const oceanMap = await loadTexture(Ocean);
+    await updateLoadingProgressBar(0.5);
+
     this.group = new THREE.Group();
     this.group.rotation.z = (23.5 / 360) * 2 * Math.PI;
 
@@ -71,6 +76,9 @@ let app = {
       map: albedoMap,
       bumpMap: bumpMap,
       bumpScale: params.bumpScale,
+      roughnessMap: oceanMap,
+      metalness: params.metalness,
+      metalnessMap: oceanMap,
     });
     this.earth = new THREE.Mesh(earthGeo, earthMat);
     this.group.add(this.earth);
@@ -112,6 +120,20 @@ let app = {
       `
       );
 
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <roughnessmap_fragment>",
+        `
+        float roughnessFactor = roughness;
+        #ifdef USE_ROUGHNESSMAP
+          vec4 texelRoughness = texture2D( roughnessMap, vRoughnessMapUv );
+          // reversing the black and white values because we provide the ocean map
+          texelRoughness = vec4(1.0) - texelRoughness;
+          // reads channel G, compatible with a combined OcclusionRoughnessMetallic (RGB) texture
+          roughnessFactor *= clamp(texelRoughness.g, 0.5, 1.0);
+        #endif
+      `
+      );
+
       earthMat.userData.shader = shader;
     };
 
@@ -129,6 +151,12 @@ let app = {
         this.earth.material.bumpScale = val;
       })
       .name("Bump Scale");
+    gui
+      .add(params, "metalness", 0.0, 1.0, 0.05)
+      .onChange((val) => {
+        earthMat.metalness = val;
+      })
+      .name("Ocean Metalness");
 
     this.stats1 = new Stats();
     this.stats1.showPanel(0);
