@@ -3,6 +3,7 @@ import * as THREE from "three";
 import * as dat from "dat.gui";
 import Stats from "three/examples/jsm/libs/stats.module";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import gsap from "gsap";
 
 // Core boilerplate code deps
 import {
@@ -46,7 +47,7 @@ let scene = new THREE.Scene();
 let renderer = createRenderer({ antialias: true }, (_renderer) => {
   _renderer.outputColorSpace = THREE.SRGBColorSpace;
 });
-let camera = createCamera(45, 1, 1000, { x: 0, y: 0, z: 30 });
+let camera = createCamera(45, 1, 1000, { x: 0, y: 0, z: 100 }); // Start camera further out
 
 /**************************************************
  * 2. Build your scene in this threejs app
@@ -223,6 +224,22 @@ let app = {
     this.container.appendChild(this.stats1.domElement);
 
     await updateLoadingProgressBar(1.0, 100);
+
+    // Zoom in animation
+    gsap.to(camera.position, {
+      z: 30,
+      duration: 5,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        camera.updateProjectionMatrix();
+      },
+      onComplete: () => {
+        this.controls.enabled = true; // Enable controls after zoom-in
+      },
+    });
+
+    // Disable controls during zoom-in
+    this.controls.enabled = false;
   },
 
   updateScene(interval, elapsed) {
