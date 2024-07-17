@@ -18,6 +18,7 @@ import Albedo from "./assets/Albedo.png";
 import Bump from "./assets/Bump.jpg";
 import Clouds from "./assets/Clouds.png";
 import Ocean from "./assets/Ocean.png";
+import NightLights from "./assets/night_lights_modified.png";
 
 global.THREE = THREE;
 THREE.ColorManagement.enabled = true;
@@ -68,6 +69,9 @@ let app = {
     const oceanMap = await loadTexture(Ocean);
     await updateLoadingProgressBar(0.5);
 
+    const lightsMap = await loadTexture(NightLights);
+    await updateLoadingProgressBar(0.6);
+
     this.group = new THREE.Group();
     this.group.rotation.z = (23.5 / 360) * 2 * Math.PI;
 
@@ -79,6 +83,8 @@ let app = {
       roughnessMap: oceanMap,
       metalness: params.metalness,
       metalnessMap: oceanMap,
+      emissiveMap: lightsMap,
+      emissive: new THREE.Color(0xffff88),
     });
     this.earth = new THREE.Mesh(earthGeo, earthMat);
     this.group.add(this.earth);
@@ -112,7 +118,22 @@ let app = {
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <emissivemap_fragment>",
         `
-        #include <emissivemap_fragment>
+        #ifdef USE_EMISSIVEMAP
+          vec4 emissiveColor = texture2D( emissiveMap, vEmissiveMapUv );
+          
+          // Methodology of showing night lights only:
+          // 
+          // going through the shader calculations in the meshphysical shader chunks (mostly on the vertex side),
+          // we can confirm that geometryNormal is the normalized normal in view space,
+          // for the night side of the earth, the dot product between geometryNormal and the directional light would be negative
+          // since the direction vector actually points from target to position of the DirectionalLight,
+          // for lit side of the earth, the reverse happens thus emissiveColor would be multiplied with 0.
+          // The smoothstep is to smoothen the change between night and day
+          
+          emissiveColor *= 1.0 - smoothstep(-0.02, 0.0, dot(geometryNormal, directionalLights[0].direction));
+          
+          totalEmissiveRadiance *= emissiveColor.rgb;
+        #endif
 
         float cloudsMapValue = texture2D(tClouds, vec2(vMapUv.x - uv_xOffset, vMapUv.y)).r;
         
