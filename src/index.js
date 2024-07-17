@@ -19,6 +19,8 @@ import Bump from "./assets/Bump.jpg";
 import Clouds from "./assets/Clouds.png";
 import Ocean from "./assets/Ocean.png";
 import NightLights from "./assets/night_lights_modified.png";
+import vertexShader from "./shaders/vertex.glsl";
+import fragmentShader from "./shaders/fragment.glsl";
 
 global.THREE = THREE;
 THREE.ColorManagement.enabled = true;
@@ -32,6 +34,9 @@ const params = {
   bumpScale: 0.03,
   metalness: 0.1,
   fresnelIntensity: 1.4,
+  atmOpacity: { value: 0.7 },
+  atmPowFactor: { value: 4.1 },
+  atmMultiplier: { value: 6.9 },
 };
 
 /**************************************************
@@ -98,6 +103,21 @@ let app = {
     this.clouds = new THREE.Mesh(cloudGeo, cloudsMat);
     this.group.add(this.clouds);
 
+    let atmosGeo = new THREE.SphereGeometry(12.5, 64, 64);
+    let atmosMat = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: {
+        atmOpacity: params.atmOpacity,
+        atmPowFactor: params.atmPowFactor,
+        atmMultiplier: params.atmMultiplier,
+      },
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+    });
+    this.atmos = new THREE.Mesh(atmosGeo, atmosMat);
+    this.group.add(this.atmos);
+
     this.earth.rotateY(-0.3);
     this.clouds.rotateY(-0.3);
 
@@ -134,7 +154,6 @@ let app = {
         diffuseColor.rgb *= max(1.0 - cloudsMapValue, 0.2);
 
         // adding a small amount of atmospheric fresnel effect to make it more realistic
-        // fine tune the first constant below for stronger or weaker effect
         float intensity = fresnelIntensity - dot(geometryNormal, vec3(0.0, 0.0, 1.0));
         vec3 atmosphere = vec3(0.3, 0.6, 1.0) * pow(intensity, 5.0);
         diffuseColor.rgb += atmosphere;
@@ -187,6 +206,15 @@ let app = {
         }
       })
       .name("Atmosphere Intensity");
+    gui
+      .add(params.atmOpacity, "value", 0.0, 1.0, 0.05)
+      .name("Atmosphere Opacity");
+    gui
+      .add(params.atmPowFactor, "value", 0.0, 20.0, 0.1)
+      .name("Atmosphere Power");
+    gui
+      .add(params.atmMultiplier, "value", 0.0, 20.0, 0.1)
+      .name("Atmosphere Multiplier");
 
     this.stats1 = new Stats();
     this.stats1.showPanel(0);
