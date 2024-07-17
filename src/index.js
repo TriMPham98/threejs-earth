@@ -31,6 +31,7 @@ const params = {
   speedFactor: 2.0,
   bumpScale: 0.03,
   metalness: 0.1,
+  fresnelIntensity: 1.4,
 };
 
 /**************************************************
@@ -106,12 +107,14 @@ let app = {
       shader.uniforms.tClouds = { value: cloudsMap };
       shader.uniforms.tClouds.value.wrapS = THREE.RepeatWrapping;
       shader.uniforms.uv_xOffset = { value: 0 };
+      shader.uniforms.fresnelIntensity = { value: params.fresnelIntensity };
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <common>",
         `
         #include <common>
         uniform sampler2D tClouds;
         uniform float uv_xOffset;
+        uniform float fresnelIntensity;
       `
       );
 
@@ -121,15 +124,6 @@ let app = {
         #ifdef USE_EMISSIVEMAP
           vec4 emissiveColor = texture2D( emissiveMap, vEmissiveMapUv );
           
-          // Methodology of showing night lights only:
-          // 
-          // going through the shader calculations in the meshphysical shader chunks (mostly on the vertex side),
-          // we can confirm that geometryNormal is the normalized normal in view space,
-          // for the night side of the earth, the dot product between geometryNormal and the directional light would be negative
-          // since the direction vector actually points from target to position of the DirectionalLight,
-          // for lit side of the earth, the reverse happens thus emissiveColor would be multiplied with 0.
-          // The smoothstep is to smoothen the change between night and day
-          
           emissiveColor *= 1.0 - smoothstep(-0.02, 0.0, dot(geometryNormal, directionalLights[0].direction));
           
           totalEmissiveRadiance *= emissiveColor.rgb;
@@ -138,6 +132,12 @@ let app = {
         float cloudsMapValue = texture2D(tClouds, vec2(vMapUv.x - uv_xOffset, vMapUv.y)).r;
         
         diffuseColor.rgb *= max(1.0 - cloudsMapValue, 0.2);
+
+        // adding a small amount of atmospheric fresnel effect to make it more realistic
+        // fine tune the first constant below for stronger or weaker effect
+        float intensity = fresnelIntensity - dot(geometryNormal, vec3(0.0, 0.0, 1.0));
+        vec3 atmosphere = vec3(0.3, 0.6, 1.0) * pow(intensity, 5.0);
+        diffuseColor.rgb += atmosphere;
       `
       );
 
@@ -178,6 +178,15 @@ let app = {
         earthMat.metalness = val;
       })
       .name("Ocean Metalness");
+    gui
+      .add(params, "fresnelIntensity", 0.0, 3.0, 0.1)
+      .onChange((val) => {
+        const shader = earthMat.userData.shader;
+        if (shader) {
+          shader.uniforms.fresnelIntensity.value = val;
+        }
+      })
+      .name("Atmosphere Intensity");
 
     this.stats1 = new Stats();
     this.stats1.showPanel(0);
